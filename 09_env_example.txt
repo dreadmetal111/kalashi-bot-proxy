@@ -1,0 +1,12 @@
+# Optional Kalshi auth for endpoints that need signed requests
+KALSHI_API_KEY_ID=your_kalshi_key_id
+KALSHI_PRIVATE_KEY_PEM="-----BEGIN PRIVATE KEY-----
+YOUR_PRIVATE_KEY_HERE
+-----END PRIVATE KEY-----"
+
+# Optional overrides
+PORT=3000
+KALSHI_BASE=https://api.elections.kalshi.com/trade-api/v2
+COINBASE_EXCHANGE_BASE=https://api.exchange.coinbase.com
+RSS_BTC_NEWS_URL=
+RSS_FALLBACK_URL=https://news.google.com/rss/search?q=Bitcoin%20OR%20BTC&hl=en-US&gl=US&ceid=US:en

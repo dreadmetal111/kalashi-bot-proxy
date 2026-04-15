@@ -1,0 +1,407 @@
+openapi: 3.1.0
+info:
+  title: Kalshi BTC 15M Analyst API
+  version: 1.0.0
+  description: |
+    Proxy API for a custom GPT that analyzes Kalshi BTC 15-minute markets using
+    Kalshi market data, Coinbase BTC spot data, and recent Bitcoin news.
+servers:
+  - url: https://YOUR_DOMAIN_HERE
+    description: Replace with your deployed proxy URL
+paths:
+  /kalshi/active-market:
+    get:
+      operationId: get_active_kalshi_market
+      summary: Get the currently relevant open Kalshi market for a series
+      description: |
+        Returns the most relevant open market in the requested Kalshi series.
+        For BTC 15-minute analysis, use series_ticker=KXBTC15M.
+      parameters:
+        - name: series_ticker
+          in: query
+          required: false
+          schema:
+            type: string
+            default: KXBTC15M
+        - name: now_iso
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Optional override for current time in ISO-8601.
+        - name: include_event
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Active market response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  selected_at:
+                    type: string
+                    format: date-time
+                  market:
+                    $ref: '#/components/schemas/KalshiMarket'
+                  event:
+                    $ref: '#/components/schemas/KalshiEvent'
+  /kalshi/orderbook:
+    get:
+      operationId: get_kalshi_orderbook
+      summary: Get Kalshi order book for a market ticker
+      parameters:
+        - name: ticker
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: depth
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 0
+            maximum: 100
+      responses:
+        '200':
+          description: Orderbook data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ticker:
+                    type: string
+                  depth:
+                    type: integer
+                  orderbook_fp:
+                    type: object
+                    properties:
+                      yes_dollars:
+                        type: array
+                        items:
+                          type: array
+                          prefixItems:
+                            - type: string
+                            - type: string
+                      no_dollars:
+                        type: array
+                        items:
+                          type: array
+                          prefixItems:
+                            - type: string
+                            - type: string
+  /kalshi/recent-trades:
+    get:
+      operationId: get_kalshi_recent_trades
+      summary: Get recent Kalshi trades for a market ticker
+      parameters:
+        - name: ticker
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 1000
+        - name: lookback_seconds
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1800
+            minimum: 60
+            maximum: 86400
+      responses:
+        '200':
+          description: Recent trades
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ticker:
+                    type: string
+                  lookback_seconds:
+                    type: integer
+                  trades:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/KalshiTrade'
+  /btc/spot-snapshot:
+    get:
+      operationId: get_btc_spot_snapshot
+      summary: Get current BTC spot snapshot from Coinbase Exchange
+      parameters:
+        - name: product_id
+          in: query
+          required: false
+          schema:
+            type: string
+            default: BTC-USD
+      responses:
+        '200':
+          description: BTC spot snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  product_id:
+                    type: string
+                  ticker:
+                    type: object
+                    additionalProperties: true
+                  stats:
+                    type: object
+                    additionalProperties: true
+  /btc/candles:
+    get:
+      operationId: get_btc_candles
+      summary: Get BTC candles from Coinbase Exchange
+      parameters:
+        - name: product_id
+          in: query
+          required: false
+          schema:
+            type: string
+            default: BTC-USD
+        - name: granularity
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 60
+            enum: [60, 300, 900, 3600, 21600, 86400]
+        - name: start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 60
+            minimum: 1
+            maximum: 300
+      responses:
+        '200':
+          description: BTC candles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  product_id:
+                    type: string
+                  granularity:
+                    type: integer
+                  candles:
+                    type: array
+                    description: Coinbase candle arrays [time, low, high, open, close, volume]
+                    items:
+                      type: array
+                      items:
+                        oneOf:
+                          - type: integer
+                          - type: number
+                          - type: string
+  /btc/orderbook-top:
+    get:
+      operationId: get_btc_orderbook_top
+      summary: Get top BTC order book levels from Coinbase Exchange
+      parameters:
+        - name: product_id
+          in: query
+          required: false
+          schema:
+            type: string
+            default: BTC-USD
+        - name: level
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 2
+            enum: [1, 2, 3]
+        - name: top_n
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
+      responses:
+        '200':
+          description: BTC order book
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  product_id:
+                    type: string
+                  level:
+                    type: integer
+                  time:
+                    type: string
+                    nullable: true
+                  bids:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        oneOf:
+                          - type: string
+                          - type: integer
+                  asks:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        oneOf:
+                          - type: string
+                          - type: integer
+  /news/recent-btc:
+    get:
+      operationId: get_recent_btc_news
+      summary: Get recent Bitcoin headlines from RSS sources
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+            default: Bitcoin OR BTC
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 25
+        - name: lookback_hours
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 24
+            minimum: 1
+            maximum: 168
+      responses:
+        '200':
+          description: Recent BTC headlines
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  query:
+                    type: string
+                  lookback_hours:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        title:
+                          type: string
+                        link:
+                          type: string
+                        source:
+                          type: string
+                        published_at:
+                          type: string
+                          nullable: true
+                        snippet:
+                          type: string
+                          nullable: true
+components:
+  schemas:
+    KalshiMarket:
+      type: object
+      properties:
+        ticker:
+          type: string
+        event_ticker:
+          type: string
+        title:
+          type: string
+        subtitle:
+          type: string
+        status:
+          type: string
+        yes_bid_dollars:
+          type: string
+        yes_ask_dollars:
+          type: string
+        no_bid_dollars:
+          type: string
+        no_ask_dollars:
+          type: string
+        last_price_dollars:
+          type: string
+        volume_fp:
+          type: string
+        open_interest_fp:
+          type: string
+        liquidity_dollars:
+          type: string
+        expected_expiration_time:
+          type: string
+        expiration_time:
+          type: string
+        rules_primary:
+          type: string
+        rules_secondary:
+          type: string
+        functional_strike:
+          type: string
+        floor_strike:
+          type: number
+        cap_strike:
+          type: number
+    KalshiTrade:
+      type: object
+      properties:
+        trade_id:
+          type: string
+        ticker:
+          type: string
+        count_fp:
+          type: string
+        yes_price_dollars:
+          type: string
+        no_price_dollars:
+          type: string
+        taker_side:
+          type: string
+        created_time:
+          type: string
+    KalshiEvent:
+      type: object
+      additionalProperties: true

@@ -124,8 +124,8 @@ function normalizeKalshiMarket(raw) {
     status: raw.status ?? null,
     event_ticker: raw.event_ticker ?? null,
     series_ticker: raw.series_ticker ?? null,
-    floor_strike: raw.floor_strike ?? raw.floor_strike_dollars ?? null,
-    cap_strike: raw.cap_strike ?? raw.cap_strike_dollars ?? null,
+    floor_strike: toNumber(raw.floor_strike) ?? toNumber(raw.floor_strike_dollars) ?? null,
+    cap_strike: toNumber(raw.cap_strike) ?? toNumber(raw.cap_strike_dollars) ?? null,
     strike_type: raw.strike_type ?? null,
     yes_bid_dollars: yesBid,
     yes_ask_dollars: yesAsk,
@@ -142,7 +142,8 @@ function normalizeKalshiMarket(raw) {
     volume:
       toNumber(raw.volume) ??
       toNumber(raw.volume_dollars) ??
-      toNumber(raw.volume_24h) ??
+      toNumber(raw.volume_24h_fp) ??
+      toNumber(raw.volume_fp) ??
       null,
     liquidity:
       toNumber(raw.liquidity) ??
@@ -274,7 +275,6 @@ async function getActiveKalshiMarket({ ticker, series_ticker = "KXBTC15M", limit
 
   const cappedLimit = clampInt(limit, 200, 1, 1000);
 
-  // First try: filter directly by series_ticker
   const filteredUrl = buildUrl(KALSHI_BASE, "markets", {
     status: "open",
     series_ticker,
@@ -289,7 +289,6 @@ async function getActiveKalshiMarket({ ticker, series_ticker = "KXBTC15M", limit
     return pickBestActiveMarket(filteredMarkets, series_ticker);
   }
 
-  // Fallback: broad fetch, then hard-filter locally
   const broadUrl = buildUrl(KALSHI_BASE, "markets", {
     status: "open",
     limit: cappedLimit,
@@ -307,6 +306,8 @@ async function getActiveKalshiMarket({ ticker, series_ticker = "KXBTC15M", limit
       m.title,
       m.question,
       m.raw?.subtitle,
+      m.raw?.yes_sub_title,
+      m.raw?.no_sub_title,
     ]
       .filter(Boolean)
       .join(" ")
@@ -322,44 +323,62 @@ async function getActiveKalshiMarket({ ticker, series_ticker = "KXBTC15M", limit
   return pickBestActiveMarket(hardFiltered, series_ticker);
 }
 
-async function getKalshiOrderbook({ ticker }) {
+async function getKalshiOrderbook({ ticker, depth = 10 }) {
   if (!ticker) {
     throw new Error("ticker is required");
   }
 
   const url = buildUrl(
     KALSHI_BASE,
-    `markets/${encodeURIComponent(ticker)}/orderbook`
+    `markets/${encodeURIComponent(ticker)}/orderbook`,
+    {
+      depth: clampInt(depth, 10, 1, 100),
+    }
   );
 
   const payload = await fetchJson(url);
   return summarizeKalshiOrderbook(payload);
 }
 
-async function getKalshiRecentTrades({ ticker, limit = 50, cursor } = {}) {
+async function getKalshiRecentTrades({
+  ticker,
+  limit = 50,
+  cursor,
+  lookback_seconds = 1800,
+} = {}) {
+  const cappedLimit = clampInt(limit, 50, 1, 1000);
+  const cappedLookback = clampInt(lookback_seconds, 1800, 60, 86400);
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const minTs = nowSec - cappedLookback;
+
   const url = buildUrl(KALSHI_BASE, "markets/trades", {
-    tickers: ticker || undefined,
-    limit: clampInt(limit, 50, 1, 1000),
+    ticker: ticker || undefined,
+    limit: cappedLimit,
     cursor,
+    min_ts: minTs,
   });
 
   const payload = await fetchJson(url);
-  const trades = extractItemsArray(payload, ["trades", "data"]).map((trade) => ({
-    trade_id: trade.trade_id ?? null,
-    ticker: trade.ticker ?? null,
-    count_fp: trade.count_fp ?? trade.count ?? null,
-    yes_price_dollars:
-      toNumber(trade.yes_price_dollars) ??
-      toNumber(trade.yes_price) ??
-      null,
-    no_price_dollars:
-      toNumber(trade.no_price_dollars) ??
-      toNumber(trade.no_price) ??
-      null,
-    taker_side: trade.taker_side ?? null,
-    created_time: trade.created_time ?? null,
-    raw: trade,
-  }));
+
+  const trades = extractItemsArray(payload, ["trades", "data"])
+    .map((trade) => ({
+      trade_id: trade.trade_id ?? null,
+      ticker: trade.ticker ?? null,
+      count_fp: trade.count_fp ?? trade.count ?? null,
+      yes_price_dollars:
+        toNumber(trade.yes_price_dollars) ??
+        toNumber(trade.yes_price) ??
+        null,
+      no_price_dollars:
+        toNumber(trade.no_price_dollars) ??
+        toNumber(trade.no_price) ??
+        null,
+      taker_side: trade.taker_side ?? null,
+      created_time: trade.created_time ?? null,
+      raw: trade,
+    }))
+    .filter((trade) => !ticker || trade.ticker === ticker);
 
   return {
     trades,
@@ -447,8 +466,13 @@ async function getBtcCandles({
   };
 }
 
-async function getBtcOrderbookTop({ product_id = "BTC-USD", level = 2 } = {}) {
-  const levelInt = clampInt(level, 2, 1, 3);
+async function getBtcOrderbookTop({
+  product_id = "BTC-USD",
+  level = 1,
+  top_n = 5,
+} = {}) {
+  const levelInt = clampInt(level, 1, 1, 3);
+  const topN = clampInt(top_n, 5, 1, 20);
 
   const payload = await fetchJson(
     buildUrl(COINBASE_BASE, `products/${encodeURIComponent(product_id)}/book`, {
@@ -456,32 +480,35 @@ async function getBtcOrderbookTop({ product_id = "BTC-USD", level = 2 } = {}) {
     })
   );
 
-  const bestBid = Array.isArray(payload?.bids) && payload.bids[0]
+  const bids = Array.isArray(payload?.bids) ? payload.bids.slice(0, topN) : [];
+  const asks = Array.isArray(payload?.asks) ? payload.asks.slice(0, topN) : [];
+
+  const bestBid = bids[0]
     ? {
-        price: toNumber(payload.bids[0][0]),
-        size: toNumber(payload.bids[0][1]),
-        num_orders: payload.bids[0][2] ?? null,
+        price: toNumber(bids[0][0]),
+        size: toNumber(bids[0][1]),
+        num_orders: bids[0][2] ?? null,
       }
     : null;
 
-  const bestAsk = Array.isArray(payload?.asks) && payload.asks[0]
+  const bestAsk = asks[0]
     ? {
-        price: toNumber(payload.asks[0][0]),
-        size: toNumber(payload.asks[0][1]),
-        num_orders: payload.asks[0][2] ?? null,
+        price: toNumber(asks[0][0]),
+        size: toNumber(asks[0][1]),
+        num_orders: asks[0][2] ?? null,
       }
     : null;
 
   return {
     product_id,
     level: levelInt,
+    top_n: topN,
     sequence: payload?.sequence ?? null,
     time: payload?.time ?? null,
     best_bid: bestBid,
     best_ask: bestAsk,
-    bids: Array.isArray(payload?.bids) ? payload.bids : [],
-    asks: Array.isArray(payload?.asks) ? payload.asks : [],
-    raw: payload,
+    bids,
+    asks,
   };
 }
 
@@ -562,6 +589,7 @@ app.get("/get_kalshi_orderbook", async (req, res) => {
   try {
     const data = await getKalshiOrderbook({
       ticker: req.query.ticker,
+      depth: req.query.depth || 10,
     });
 
     res.json({
@@ -580,6 +608,7 @@ app.get("/get_kalshi_recent_trades", async (req, res) => {
       ticker: req.query.ticker,
       limit: req.query.limit,
       cursor: req.query.cursor,
+      lookback_seconds: req.query.lookback_seconds || 1800,
     });
 
     res.json({
@@ -627,7 +656,8 @@ app.get("/get_btc_orderbook_top", async (req, res) => {
   try {
     const data = await getBtcOrderbookTop({
       product_id: req.query.product_id || "BTC-USD",
-      level: req.query.level || 2,
+      level: req.query.level || 1,
+      top_n: req.query.top_n || 5,
     });
 
     res.json({

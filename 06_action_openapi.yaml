@@ -1,4 +1,4 @@
-openapi: 3.1.1
+openapi: 3.1.0
 info:
   title: Kalshi BTC 15M Analyst API
   version: 1.0.0
@@ -53,6 +53,12 @@ paths:
           required: true
           schema:
             type: string
+        - name: depth
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
       responses:
         "200":
           description: Orderbook response
@@ -64,8 +70,9 @@ paths:
                   ok:
                     type: boolean
                   ticker:
-                    type: string
-                    nullable: true
+                    type:
+                      - string
+                      - "null"
                   orderbook:
                     $ref: "#/components/schemas/KalshiOrderbook"
 
@@ -90,6 +97,12 @@ paths:
           required: false
           schema:
             type: string
+        - name: lookback_seconds
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1800
       responses:
         "200":
           description: Recent trades response
@@ -101,8 +114,9 @@ paths:
                   ok:
                     type: boolean
                   cursor:
-                    type: string
-                    nullable: true
+                    type:
+                      - string
+                      - "null"
                   trades:
                     type: array
                     items:
@@ -194,7 +208,13 @@ paths:
           schema:
             type: integer
             enum: [1, 2, 3]
-            default: 2
+            default: 1
+        - name: top_n
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 5
       responses:
         "200":
           description: BTC orderbook response
@@ -244,117 +264,157 @@ components:
       type: object
       properties:
         ticker:
-          type: string
+          type:
+            - string
+            - "null"
         title:
-          type: string
+          type:
+            - string
+            - "null"
         question:
-          type: string
+          type:
+            - string
+            - "null"
         status:
-          type: string
+          type:
+            - string
+            - "null"
         event_ticker:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         series_ticker:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         floor_strike:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         cap_strike:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         strike_type:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         yes_bid_dollars:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         yes_ask_dollars:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         no_bid_dollars:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         no_ask_dollars:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         last_price_dollars:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         previous_yes_bid_dollars:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         volume:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         liquidity:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         open_interest:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         yes_bid_size_fp:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         yes_ask_size_fp:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         close_time:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
 
     KalshiOrderbook:
       type: object
       properties:
         best_yes_bid_dollars:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         best_yes_ask_dollars:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         best_no_bid_dollars:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         best_no_ask_dollars:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         yes_bids:
           type: array
           items:
             type: array
             items:
-              type: string
+              type:
+                - string
+                - number
         no_bids:
           type: array
           items:
             type: array
             items:
-              type: string
+              type:
+                - string
+                - number
 
     KalshiTrade:
       type: object
       properties:
         trade_id:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         ticker:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         count_fp:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         yes_price_dollars:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         no_price_dollars:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         taker_side:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         created_time:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
 
     BtcSpotSnapshot:
       type: object
@@ -362,41 +422,53 @@ components:
         product_id:
           type: string
         price:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         bid:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         ask:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         size:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         trade_time:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         trade_id:
-          type: integer
-          nullable: true
+          type:
+            - integer
+            - "null"
         volume_24h:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         open_24h:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         high_24h:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         low_24h:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         last_24h:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         volume_30d:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
 
     Candle:
       type: object
@@ -404,20 +476,25 @@ components:
         time:
           type: string
         low:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         high:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         open:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         close:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
         volume:
-          type: number
-          nullable: true
+          type:
+            - number
+            - "null"
 
     BtcOrderbook:
       type: object
@@ -426,63 +503,85 @@ components:
           type: string
         level:
           type: integer
-        sequence:
+        top_n:
           type: integer
-          nullable: true
+        sequence:
+          type:
+            - integer
+            - "null"
         time:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         best_bid:
-          type: object
-          nullable: true
+          type:
+            - object
+            - "null"
           properties:
             price:
-              type: number
-              nullable: true
+              type:
+                - number
+                - "null"
             size:
-              type: number
-              nullable: true
+              type:
+                - number
+                - "null"
             num_orders:
-              type: integer
-              nullable: true
+              type:
+                - integer
+                - "null"
         best_ask:
-          type: object
-          nullable: true
+          type:
+            - object
+            - "null"
           properties:
             price:
-              type: number
-              nullable: true
+              type:
+                - number
+                - "null"
             size:
-              type: number
-              nullable: true
+              type:
+                - number
+                - "null"
             num_orders:
-              type: integer
-              nullable: true
+              type:
+                - integer
+                - "null"
         bids:
           type: array
           items:
             type: array
             items:
-              type: string
+              type:
+                - string
+                - number
+                - integer
         asks:
           type: array
           items:
             type: array
             items:
-              type: string
+              type:
+                - string
+                - number
+                - integer
 
     NewsItem:
       type: object
       properties:
         title:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         link:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         source:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         published_at:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"

@@ -6,7 +6,7 @@ info:
     Proxy API for a custom GPT that analyzes Kalshi BTC 15-minute markets using
     Kalshi market data, Coinbase BTC spot data, and recent Bitcoin news.
 servers:
-  - url: https://YOUR_DOMAIN_HERE
+  - url: https://kalashi-bot-proxy.onrender.com
     description: Replace with your deployed proxy URL
 paths:
   /kalshi/active-market:

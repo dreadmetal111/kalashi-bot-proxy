@@ -167,8 +167,12 @@ function marketCloseTs(market) {
 function pickBestActiveMarket(markets, seriesTicker) {
   if (!Array.isArray(markets) || markets.length === 0) return null;
 
-  const openMarkets = markets.filter((m) => (m.status || "").toLowerCase() === "open");
-  const pool = openMarkets.length > 0 ? openMarkets : markets;
+  const statusFiltered = markets.filter((m) => {
+    const s = String(m.status || "").toLowerCase();
+    return s === "open" || s === "active";
+  });
+
+  const pool = statusFiltered.length > 0 ? statusFiltered : markets;
 
   const prefix = seriesTicker ? `${seriesTicker}-` : null;
   const seriesFiltered = prefix
@@ -268,15 +272,54 @@ async function getActiveKalshiMarket({ ticker, series_ticker = "KXBTC15M", limit
     return normalizeKalshiMarket(rawMarket);
   }
 
-  const url = buildUrl(KALSHI_BASE, "markets", {
+  const cappedLimit = clampInt(limit, 200, 1, 1000);
+
+  // First try: filter directly by series_ticker
+  const filteredUrl = buildUrl(KALSHI_BASE, "markets", {
     status: "open",
-    limit: clampInt(limit, 200, 1, 1000),
+    series_ticker,
+    limit: cappedLimit,
   });
 
-  const payload = await fetchJson(url);
-  const rawMarkets = extractItemsArray(payload, ["markets", "data"]);
-  const normalized = rawMarkets.map(normalizeKalshiMarket);
-  return pickBestActiveMarket(normalized, series_ticker);
+  const filteredPayload = await fetchJson(filteredUrl);
+  const filteredMarkets = extractItemsArray(filteredPayload, ["markets", "data"])
+    .map(normalizeKalshiMarket);
+
+  if (filteredMarkets.length > 0) {
+    return pickBestActiveMarket(filteredMarkets, series_ticker);
+  }
+
+  // Fallback: broad fetch, then hard-filter locally
+  const broadUrl = buildUrl(KALSHI_BASE, "markets", {
+    status: "open",
+    limit: cappedLimit,
+  });
+
+  const broadPayload = await fetchJson(broadUrl);
+  const broadMarkets = extractItemsArray(broadPayload, ["markets", "data"])
+    .map(normalizeKalshiMarket);
+
+  const hardFiltered = broadMarkets.filter((m) => {
+    const haystack = [
+      m.ticker,
+      m.event_ticker,
+      m.series_ticker,
+      m.title,
+      m.question,
+      m.raw?.subtitle,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toUpperCase();
+
+    return (
+      haystack.includes(String(series_ticker).toUpperCase()) ||
+      (haystack.includes("BTC") && haystack.includes("15M")) ||
+      haystack.includes("BITCOIN PRICE UP DOWN")
+    );
+  });
+
+  return pickBestActiveMarket(hardFiltered, series_ticker);
 }
 
 async function getKalshiOrderbook({ ticker }) {

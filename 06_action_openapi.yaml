@@ -1,111 +1,82 @@
-openapi: 3.1.0
+openapi: 3.0.3
 info:
   title: Kalshi BTC 15M Analyst API
   version: 1.0.0
-  description: |
-    Proxy API for a custom GPT that analyzes Kalshi BTC 15-minute markets using
-    Kalshi market data, Coinbase BTC spot data, and recent Bitcoin news.
+  description: Proxy API for the Kalshi BTC 15-minute analyst GPT.
+
 servers:
   - url: https://kalashi-bot-proxy.onrender.com
-    description: Replace with your deployed proxy URL
+
 paths:
-  /kalshi/active-market:
+  /get_active_kalshi_market:
     get:
       operationId: get_active_kalshi_market
-      summary: Get the currently relevant open Kalshi market for a series
-      description: |
-        Returns the most relevant open market in the requested Kalshi series.
-        For BTC 15-minute analysis, use series_ticker=KXBTC15M.
+      summary: Get the active Kalshi BTC 15-minute market
       parameters:
+        - name: ticker
+          in: query
+          required: false
+          schema:
+            type: string
         - name: series_ticker
           in: query
           required: false
           schema:
             type: string
             default: KXBTC15M
-        - name: now_iso
+        - name: limit
           in: query
           required: false
           schema:
-            type: string
-            format: date-time
-          description: Optional override for current time in ISO-8601.
-        - name: include_event
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: false
+            type: integer
+            default: 200
       responses:
-        '200':
+        "200":
           description: Active market response
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  selected_at:
-                    type: string
-                    format: date-time
+                  ok:
+                    type: boolean
                   market:
-                    $ref: '#/components/schemas/KalshiMarket'
-                  event:
-                    $ref: '#/components/schemas/KalshiEvent'
-  /kalshi/orderbook:
+                    $ref: "#/components/schemas/KalshiMarket"
+
+  /get_kalshi_orderbook:
     get:
       operationId: get_kalshi_orderbook
-      summary: Get Kalshi order book for a market ticker
+      summary: Get Kalshi orderbook for a market ticker
       parameters:
         - name: ticker
           in: query
           required: true
           schema:
             type: string
-        - name: depth
-          in: query
-          required: false
-          schema:
-            type: integer
-            default: 10
-            minimum: 0
-            maximum: 100
       responses:
-        '200':
-          description: Orderbook data
+        "200":
+          description: Orderbook response
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  ok:
+                    type: boolean
                   ticker:
                     type: string
-                  depth:
-                    type: integer
-                  orderbook_fp:
-                    type: object
-                    properties:
-                      yes_dollars:
-                        type: array
-                        items:
-                          type: array
-                          prefixItems:
-                            - type: string
-                            - type: string
-                      no_dollars:
-                        type: array
-                        items:
-                          type: array
-                          prefixItems:
-                            - type: string
-                            - type: string
-  /kalshi/recent-trades:
+                    nullable: true
+                  orderbook:
+                    $ref: "#/components/schemas/KalshiOrderbook"
+
+  /get_kalshi_recent_trades:
     get:
       operationId: get_kalshi_recent_trades
       summary: Get recent Kalshi trades for a market ticker
       parameters:
         - name: ticker
           in: query
-          required: true
+          required: false
           schema:
             type: string
         - name: limit
@@ -114,36 +85,33 @@ paths:
           schema:
             type: integer
             default: 50
-            minimum: 1
-            maximum: 1000
-        - name: lookback_seconds
+        - name: cursor
           in: query
           required: false
           schema:
-            type: integer
-            default: 1800
-            minimum: 60
-            maximum: 86400
+            type: string
       responses:
-        '200':
-          description: Recent trades
+        "200":
+          description: Recent trades response
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  ticker:
+                  ok:
+                    type: boolean
+                  cursor:
                     type: string
-                  lookback_seconds:
-                    type: integer
+                    nullable: true
                   trades:
                     type: array
                     items:
-                      $ref: '#/components/schemas/KalshiTrade'
-  /btc/spot-snapshot:
+                      $ref: "#/components/schemas/KalshiTrade"
+
+  /get_btc_spot_snapshot:
     get:
       operationId: get_btc_spot_snapshot
-      summary: Get current BTC spot snapshot from Coinbase Exchange
+      summary: Get current BTC spot snapshot
       parameters:
         - name: product_id
           in: query
@@ -152,25 +120,22 @@ paths:
             type: string
             default: BTC-USD
       responses:
-        '200':
-          description: BTC spot snapshot
+        "200":
+          description: BTC spot snapshot response
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  product_id:
-                    type: string
-                  ticker:
-                    type: object
-                    additionalProperties: true
-                  stats:
-                    type: object
-                    additionalProperties: true
-  /btc/candles:
+                  ok:
+                    type: boolean
+                  snapshot:
+                    $ref: "#/components/schemas/BtcSpotSnapshot"
+
+  /get_btc_candles:
     get:
       operationId: get_btc_candles
-      summary: Get BTC candles from Coinbase Exchange
+      summary: Get BTC candles
       parameters:
         - name: product_id
           in: query
@@ -183,54 +148,39 @@ paths:
           required: false
           schema:
             type: integer
-            default: 60
             enum: [60, 300, 900, 3600, 21600, 86400]
-        - name: start
-          in: query
-          required: false
-          schema:
-            type: string
-            format: date-time
-        - name: end
-          in: query
-          required: false
-          schema:
-            type: string
-            format: date-time
+            default: 60
         - name: limit
           in: query
           required: false
           schema:
             type: integer
-            default: 60
-            minimum: 1
-            maximum: 300
+            default: 30
       responses:
-        '200':
-          description: BTC candles
+        "200":
+          description: BTC candles response
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  ok:
+                    type: boolean
                   product_id:
                     type: string
                   granularity:
                     type: integer
+                  raw_count:
+                    type: integer
                   candles:
                     type: array
-                    description: Coinbase candle arrays [time, low, high, open, close, volume]
                     items:
-                      type: array
-                      items:
-                        oneOf:
-                          - type: integer
-                          - type: number
-                          - type: string
-  /btc/orderbook-top:
+                      $ref: "#/components/schemas/Candle"
+
+  /get_btc_orderbook_top:
     get:
       operationId: get_btc_orderbook_top
-      summary: Get top BTC order book levels from Coinbase Exchange
+      summary: Get top BTC orderbook levels
       parameters:
         - name: product_id
           in: query
@@ -243,103 +193,51 @@ paths:
           required: false
           schema:
             type: integer
-            default: 2
             enum: [1, 2, 3]
-        - name: top_n
-          in: query
-          required: false
-          schema:
-            type: integer
-            default: 10
-            minimum: 1
-            maximum: 50
+            default: 2
       responses:
-        '200':
-          description: BTC order book
+        "200":
+          description: BTC orderbook response
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  product_id:
-                    type: string
-                  level:
-                    type: integer
-                  time:
-                    type: string
-                    nullable: true
-                  bids:
-                    type: array
-                    items:
-                      type: array
-                      items:
-                        oneOf:
-                          - type: string
-                          - type: integer
-                  asks:
-                    type: array
-                    items:
-                      type: array
-                      items:
-                        oneOf:
-                          - type: string
-                          - type: integer
-  /news/recent-btc:
+                  ok:
+                    type: boolean
+                  orderbook:
+                    $ref: "#/components/schemas/BtcOrderbook"
+
+  /get_recent_btc_news:
     get:
       operationId: get_recent_btc_news
-      summary: Get recent Bitcoin headlines from RSS sources
+      summary: Get recent BTC news headlines
       parameters:
-        - name: query
-          in: query
-          required: false
-          schema:
-            type: string
-            default: Bitcoin OR BTC
         - name: limit
           in: query
           required: false
           schema:
             type: integer
             default: 10
-            minimum: 1
-            maximum: 25
-        - name: lookback_hours
-          in: query
-          required: false
-          schema:
-            type: integer
-            default: 24
-            minimum: 1
-            maximum: 168
       responses:
-        '200':
-          description: Recent BTC headlines
+        "200":
+          description: Recent BTC news response
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  query:
+                  ok:
+                    type: boolean
+                  source:
                     type: string
-                  lookback_hours:
-                    type: integer
+                  query_url:
+                    type: string
                   items:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        title:
-                          type: string
-                        link:
-                          type: string
-                        source:
-                          type: string
-                        published_at:
-                          type: string
-                          nullable: true
-                        snippet:
-                          type: string
-                          nullable: true
+                      $ref: "#/components/schemas/NewsItem"
+
 components:
   schemas:
     KalshiMarket:
@@ -347,61 +245,244 @@ components:
       properties:
         ticker:
           type: string
-        event_ticker:
-          type: string
         title:
           type: string
-        subtitle:
+        question:
           type: string
         status:
           type: string
-        yes_bid_dollars:
+        event_ticker:
           type: string
-        yes_ask_dollars:
+          nullable: true
+        series_ticker:
           type: string
-        no_bid_dollars:
-          type: string
-        no_ask_dollars:
-          type: string
-        last_price_dollars:
-          type: string
-        volume_fp:
-          type: string
-        open_interest_fp:
-          type: string
-        liquidity_dollars:
-          type: string
-        expected_expiration_time:
-          type: string
-        expiration_time:
-          type: string
-        rules_primary:
-          type: string
-        rules_secondary:
-          type: string
-        functional_strike:
-          type: string
+          nullable: true
         floor_strike:
           type: number
+          nullable: true
         cap_strike:
           type: number
+          nullable: true
+        strike_type:
+          type: string
+          nullable: true
+        yes_bid_dollars:
+          type: number
+          nullable: true
+        yes_ask_dollars:
+          type: number
+          nullable: true
+        no_bid_dollars:
+          type: number
+          nullable: true
+        no_ask_dollars:
+          type: number
+          nullable: true
+        last_price_dollars:
+          type: number
+          nullable: true
+        previous_yes_bid_dollars:
+          type: number
+          nullable: true
+        volume:
+          type: number
+          nullable: true
+        liquidity:
+          type: number
+          nullable: true
+        open_interest:
+          type: number
+          nullable: true
+        yes_bid_size_fp:
+          type: string
+          nullable: true
+        yes_ask_size_fp:
+          type: string
+          nullable: true
+        close_time:
+          type: string
+          nullable: true
+
+    KalshiOrderbook:
+      type: object
+      properties:
+        best_yes_bid_dollars:
+          type: number
+          nullable: true
+        best_yes_ask_dollars:
+          type: number
+          nullable: true
+        best_no_bid_dollars:
+          type: number
+          nullable: true
+        best_no_ask_dollars:
+          type: number
+          nullable: true
+        yes_bids:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+        no_bids:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+
     KalshiTrade:
       type: object
       properties:
         trade_id:
           type: string
+          nullable: true
         ticker:
           type: string
+          nullable: true
         count_fp:
           type: string
+          nullable: true
         yes_price_dollars:
-          type: string
+          type: number
+          nullable: true
         no_price_dollars:
-          type: string
+          type: number
+          nullable: true
         taker_side:
           type: string
+          nullable: true
         created_time:
           type: string
-    KalshiEvent:
+          nullable: true
+
+    BtcSpotSnapshot:
       type: object
-      additionalProperties: true
+      properties:
+        product_id:
+          type: string
+        price:
+          type: number
+          nullable: true
+        bid:
+          type: number
+          nullable: true
+        ask:
+          type: number
+          nullable: true
+        size:
+          type: number
+          nullable: true
+        trade_time:
+          type: string
+          nullable: true
+        trade_id:
+          type: integer
+          nullable: true
+        volume_24h:
+          type: number
+          nullable: true
+        open_24h:
+          type: number
+          nullable: true
+        high_24h:
+          type: number
+          nullable: true
+        low_24h:
+          type: number
+          nullable: true
+        last_24h:
+          type: number
+          nullable: true
+        volume_30d:
+          type: number
+          nullable: true
+
+    Candle:
+      type: object
+      properties:
+        time:
+          type: string
+        low:
+          type: number
+          nullable: true
+        high:
+          type: number
+          nullable: true
+        open:
+          type: number
+          nullable: true
+        close:
+          type: number
+          nullable: true
+        volume:
+          type: number
+          nullable: true
+
+    BtcOrderbook:
+      type: object
+      properties:
+        product_id:
+          type: string
+        level:
+          type: integer
+        sequence:
+          type: integer
+          nullable: true
+        time:
+          type: string
+          nullable: true
+        best_bid:
+          type: object
+          nullable: true
+          properties:
+            price:
+              type: number
+              nullable: true
+            size:
+              type: number
+              nullable: true
+            num_orders:
+              type: integer
+              nullable: true
+        best_ask:
+          type: object
+          nullable: true
+          properties:
+            price:
+              type: number
+              nullable: true
+            size:
+              type: number
+              nullable: true
+            num_orders:
+              type: integer
+              nullable: true
+        bids:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+        asks:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+
+    NewsItem:
+      type: object
+      properties:
+        title:
+          type: string
+          nullable: true
+        link:
+          type: string
+          nullable: true
+        source:
+          type: string
+          nullable: true
+        published_at:
+          type: string
+          nullable: true
